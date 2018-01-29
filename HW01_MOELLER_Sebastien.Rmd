@@ -84,7 +84,7 @@ table32 <- cbind(b,stderr,Z)
 round(table32, 2)
 ```
 
-__Ex.2__ — Your turn
+__Ex.2__ - Your turn
 Reproduce Table 3.3, at least the first four columns that is LS, Best Subset, Ridge and
 Lasso.
 ```{r}
@@ -114,7 +114,7 @@ nt = max(dim(Xd))
 
 Table 3.1
 ```{r}
-correls(Xa)
+
 ```
 
 %% Table 3.1: Correlations of predictors in the prostate cancer data.
