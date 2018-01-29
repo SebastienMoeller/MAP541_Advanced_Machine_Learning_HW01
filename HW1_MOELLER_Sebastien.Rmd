@@ -1,0 +1,151 @@
+---
+title: "Homework 1"
+author: "Sebastien Moeller"
+date: "29/01/2018"
+output: html_document
+---
+
+## Dependencies
+```{r}
+if (!require("pacman")) install.packages("pacman")
+
+pacman::p_load(Rfast)
+```
+
+## The objectives of the Lab
+The purpose of this lab is to reproduce tables from the third chapter of the book "Elements of
+Statistical Learning" from Hastie, Tibshirani and Friedman, as they are shown bellow.
+__Ex.1__ Prepare the data
+a) Raw data is available on line, download it from moodle (theData.txt file) or from the web at http://statweb.stanford.edu/~tibs/ElemStatLearn.1stEd/datasets/prostate.data.
+```{r}
+data <- read.table("prostate.data", sep = "")
+```
+
+b) Extract and normalize the explicative variables
+```{r}
+X <- scale(data[,1:8])
+```
+
+c) Is it wise to normalize these data?
+
+
+d) Extract the target variable
+```{r}
+Y <- as.matrix(data[,"lpsa"])
+```
+
+e) Split the dataset into training and test data
+```{r}
+Xtrain <- X[data[["train"]], ]
+Ytrain <- Y[data[["train"]],]
+Xtest <- X[!data[["train"]], ]
+Ytest <- Y[!data[["train"]], ]
+```
+
+2. Compute the correlations of predictors in the prostate cancer data as presented Table 3.1
+```{r}
+Xtrainscale <- scale(Xtrain)
+
+C <- cov(as.matrix(Xtrainscale))
+```
+
+3. Reproduce the results presented Table 3.2
+a) Compute the coefficients of the linear regression model, without using the lm function (but you can use it validate your code)
+```{r}
+Xtrainone <- cbind(array(1, dim = c(nrow(Xtrain),1)), Xtrain)
+
+b <- solve(t(Xtrainone) %*% Xtrainone, t(Xtrainone) %*% Ytrain)
+```
+
+b) Compute the prediction error
+```{r}
+Ypred <- Xtrainone %*% b
+
+err <- Ytrain - Ypred
+```
+
+c) Compute the standard error for each variable
+```{r}
+sig2 <- (t(err) %*% err)/ (nrow(Xtrainone) - ncol(X) -1)
+
+v <- diag(solve(t(Xtrainone) %*% Xtrainone))
+
+stderr <- sqrt(as.vector(sig2)) * sqrt(v)
+```
+
+d) compute the Z score for each variable
+```{r}
+Z <- b/stderr
+```
+e) visualize the results and compare with table 3.2
+```{r}
+table32 <- cbind(b,stderr,Z)
+
+round(table32, 2)
+```
+
+__Ex.2__ — Your turn
+Reproduce Table 3.3, at least the first four columns that is LS, Best Subset, Ridge and
+Lasso.
+```{r}
+Xd = data[,2:9]
+n = dim(Xd)[1]
+p = dim(Xd)[2]
+
+X = (Xd - t(matrix(c(rep(colMeans(Xd), n)), ncol =  n))) / t(matrix(c(rep(c(var(Xd[1]), var(Xd[2]), var(Xd[3]), var(Xd[4]), var(Xd[5]), var(Xd[6]), var(Xd[7]), var(Xd[8])), n)), ncol =  n))
+y = data[10]
+```
+
+Training
+```{r}
+ind = which(data['train'] == 0)
+Xa = X[ind,]
+ya = y[ind,]
+na = max(dim(Xd))
+```
+
+Testing
+```{r}
+ind = which(data['train'] == 1)
+Xt = X[ind,]
+yt = y[ind,]
+nt = max(dim(Xd))
+```
+
+Table 3.1
+```{r}
+correls(Xa)
+```
+
+%% Table 3.1: Correlations of predictors in the prostate cancer data.
+
+corrcoef(Xa);
+Xr = (Xa - ones(na,1)*mean(Xa))./(ones(na,1)*std(Xa));
+Cv = Xr'*Xr/(n-1);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
