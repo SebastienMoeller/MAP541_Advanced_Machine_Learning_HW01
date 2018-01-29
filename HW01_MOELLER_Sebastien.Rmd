@@ -9,7 +9,7 @@ output: html_document
 ```{r}
 if (!require("pacman")) install.packages("pacman")
 
-pacman::p_load(Rfast)
+pacman::p_load(Rfast, leaps, CVXR)
 ```
 
 ## The objectives of the Lab
@@ -85,46 +85,78 @@ round(table32, 2)
 ```
 
 __Ex.2__ - Your turn
-Reproduce Table 3.3, at least the first four columns that is LS, Best Subset, Ridge and
-Lasso.
+Reproduce Table 3.3, at least the first four columns that is LS, Best Subset, Ridge and Lasso.
 ```{r}
-Xd = data[,2:9]
+Xd = data[,1:8]
 n = dim(Xd)[1]
 p = dim(Xd)[2]
 
-X = (Xd - t(matrix(c(rep(colMeans(Xd), n)), ncol =  n))) / t(matrix(c(rep(c(var(Xd[1]), var(Xd[2]), var(Xd[3]), var(Xd[4]), var(Xd[5]), var(Xd[6]), var(Xd[7]), var(Xd[8])), n)), ncol =  n))
-y = data[10]
+#X = (Xd - t(matrix(c(rep(colMeans(Xd), n)), ncol =  n)))/ t(matrix(c(rep(c(var(Xd[1]), var(Xd[2]), var(Xd[3]), var(Xd[4]), var(Xd[5]), var(Xd[6]), var(Xd[7]), var(Xd[8])), n)), ncol =  n))
+X = scale(Xd)
+y = data[9]
 ```
 
 Training
 ```{r}
-ind = which(data['train'] == 0)
-Xa = X[ind,]
-ya = y[ind,]
-na = max(dim(Xd))
+ind = which(data[10] == 1)
+Xtrain = X[ind,]
+ytrain = y[ind,]
+ntrain = max(dim(Xd))
 ```
 
 Testing
 ```{r}
-ind = which(data['train'] == 1)
-Xt = X[ind,]
-yt = y[ind,]
-nt = max(dim(Xd))
+ind = which(data[10] == 0)
+Xtest = X[ind,]
+ytest = y[ind,]
+ntest = max(dim(Xd))
 ```
 
-Table 3.1
+# LS
+```{r}
+# CVXR: An R Package for Disciplined Convex Optimization
+p <- 9
+betaHat <- Variable(p)
+Xtrainone <- cbind(array(1, dim = c(nrow(Xtrain),1)), Xtrain)
+objective <- Minimize(sum((ytrain  - Xtrainone %*% betaHat)^2))
+problem <- Problem(objective)
+result <- solve(problem)
+
+# LS
+bo <- result$getValue(betaHat)
+round(1000*bo)/1000
+# Correct values
+b <- solve(t(Xtrainone) %*% Xtrainone, t(Xtrainone) %*% ytrain)
+round(1000*b)/1000
+```
+
+
+# Best Subset
+```{r}
+df <- as.data.frame(cbind(Xtrain,ytrain))
+
+best.subset <- regsubsets(ytrain~., df)
+best.subset.summary <- summary(best.subset)
+best.subset.summary$outmat
+```
+
+```{r}
+best.subset.by.bic <- which.min(best.subset.summary$bic)
+plot(best.subset.summary$bic, xlab="Number of Variables", ylab="BIC", type="l")
+points(best.subset.by.bic, best.subset.summary$bic[best.subset.by.bic], col="red", cex =2, pch =20)
+```
+
+
+# Ridge
+```{r}
+mx = colMeans(Xtrain)
+Xc = Xd - t(matrix(c(1, ntrain*p), ncol =  n))
+```
+
+# Lasso
 ```{r}
 
 ```
-
-%% Table 3.1: Correlations of predictors in the prostate cancer data.
-
-corrcoef(Xa);
-Xr = (Xa - ones(na,1)*mean(Xa))./(ones(na,1)*std(Xa));
-Cv = Xr'*Xr/(n-1);
-
-
-
 
 
 
