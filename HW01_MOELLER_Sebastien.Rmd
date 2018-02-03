@@ -133,21 +133,42 @@ BS
 BS <- rbind(BS, NA, NA, NA, NA, NA, NA)
 ```
 
-
 ```{r}
 # The Ridge
-p <- 9
-lambda <- 24
-ys = scale(Ytrain)
-betaHat <- Variable(p-1)
-objective <- Minimize(sum((ys - Xtrainscale %*% betaHat)^2) + lambda*sum((betaHat)^2))
-problem <- Problem(objective)
-result <- solve(problem)
+ridge <- function(lambda){
+  br <- solve(t(Xtrain) %*% Xtrain + diag(x = lambda, ncol(Xtrain)), t(Xtrain) %*% (Ytrain - mean(Ytrain)))
+  br <- rbind(mean(Ytrain), br)
+  br
+}
 
-d <- sqrt(diag(var(Xtrain)))
-br <- result$getValue(betaHat)*sqrt(var(Ytrain)) / d
-Ridge <- round(1000*br)/1000
-Ridge <- rbind(round(1000*mean(Ytrain))/1000, Ridge)
+Ridge <- round(1000*ridge(24))/1000
+Ridge
+```
+
+
+```{r}
+# The Ridge lambda calulation
+error <- function(ridge){
+  # We need to add the intercept, not multiply it
+  # Testing error
+  Yhattest <- ridge[-1] %*% t(Xtest) + ridge[1]
+  testError <- sum((Ytest - Yhattest)^2)/dim(Xtest)[1]
+  # Training error
+  Yhattrain <- ridge[-1] %*% t(Xtrain) + ridge[1]
+  trainError <- sum((Ytrain - Yhattrain)^2)/dim(Xtrain)[1]
+  
+  rbind(testError, trainError)
+}
+```
+
+```{r}
+all_lambda <- seq(1, 100, 1)
+```
+
+
+
+```{r}
+Ridge <- ridge(24)
 Ridge
 ```
 
