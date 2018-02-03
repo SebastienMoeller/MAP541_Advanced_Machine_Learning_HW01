@@ -9,7 +9,7 @@ output: html_document
 ```{r}
 if (!require("pacman")) install.packages("pacman")
 
-pacman::p_load(Rfast, CVXR)
+pacman::p_load(Rfast, CVXR, caTools)
 ```
 
 ## The objectives of the Lab
@@ -157,12 +157,63 @@ error <- function(ridge){
   Yhattrain <- ridge[-1] %*% t(Xtrain) + ridge[1]
   trainError <- sum((Ytrain - Yhattrain)^2)/dim(Xtrain)[1]
   
-  rbind(testError, trainError)
+  cbind(testError, trainError)
 }
 ```
 
 ```{r}
-all_lambda <- seq(1, 100, 1)
+all_lambda <- seq(0, 100, 1)
+
+out <- NA
+for (i in all_lambda){
+  out <- rbind(out, error(ridge(i)))
+}
+testLambda <- cbind(all_lambda, out[-1,])
+```
+
+```{r}
+all_lambda <- seq(0, 20, .1)
+
+out <- NA
+for (i in all_lambda){
+  out <- rbind(out, error(ridge(i)))
+}
+testLambda <- cbind(all_lambda, out[-1,])
+
+plot(testLambda)
+
+testLambda[which(testLambda[,2] == min(testLambda[,2])),1]
+```
+
+```{r}
+# 65543
+set.seed(1000)
+testLambda <- NA
+for (j in 1:100){
+  data$train <- sample.split(rep(1, dim(data)[1]), SplitRatio = .25)
+  Xtrain <- X[data[["train"]], ]
+  Xtrainscale <- scale(Xtrain)
+  Ytrain <- Y[data[["train"]],]
+  Xtest <- X[!data[["train"]], ] 
+  Ytest <- Y[!data[["train"]], ] 
+  
+  all_lambda <- seq(0, 30, .1)
+  
+  out <- NA
+  for (i in all_lambda){
+    out <- rbind(out, error(ridge(i)))
+  }
+  testLambda <- cbind(testLambda, out[-1,1])
+  
+  
+  #testLambda[which(testLambda[,2] == min(testLambda[,2])),1]
+}
+testLambda[,1] <- all_lambda
+
+testLambda2 <- cbind(testLambda[,1], rowmeans(testLambda[,-1]))
+plot(testLambda2)
+
+testLambda2[which(testLambda2[,2] == min(testLambda2[,2])),1]
 ```
 
 
