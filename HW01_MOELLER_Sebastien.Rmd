@@ -133,6 +133,7 @@ BS
 BS <- rbind(BS, NA, NA, NA, NA, NA, NA)
 ```
 
+
 ```{r}
 # The Ridge
 p <- 9
@@ -177,15 +178,6 @@ colnames(table32) <- c('LS', '  Best Subset', '   Ridge', '   Lasso')
 table32
 ```
 
-What have we done here?
-
-
-
-Does not work.
-```{r}
-br <- solve(t(Xtrain) %*% Xtrain + diag(x = 24, ncol(Xtrain)), t(Xtrain) %*% (Ytrain - mean(Ytrain)))
-br
-```
 
 
 
