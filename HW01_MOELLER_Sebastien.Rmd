@@ -9,7 +9,7 @@ output: html_document
 ```{r}
 if (!require("pacman")) install.packages("pacman")
 
-pacman::p_load(Rfast, CVXR, caTools)
+pacman::p_load(Rfast, CVXR, caTools, leaps, pls)
 ```
 
 ## The objectives of the Lab
@@ -19,6 +19,7 @@ __Ex.1__ Prepare the data
 a) Raw data is available on line, download it from moodle (theData.txt file) or from the web at http://statweb.stanford.edu/~tibs/ElemStatLearn.1stEd/datasets/prostate.data.
 ```{r}
 data <- read.table("prostate.data", sep = "")
+actualSplit <- data$train
 ```
 
 b) Extract and normalize the explicative variables
@@ -120,6 +121,21 @@ LS
 ```
 
 ```{r}
+# error calculation
+error <- function(hat){
+  # We need to add the intercept, not multiply it
+  # Testing error
+  Yhattest <- hat[-1] %*% t(Xtest) + hat[1]
+  testError <- sum((Ytest - Yhattest)^2)/dim(Xtest)[1]
+  # Training error
+  Yhattrain <- hat[-1] %*% t(Xtrain) + hat[1]
+  trainError <- sum((Ytrain - Yhattrain)^2)/dim(Xtrain)[1]
+  
+  cbind(testError, trainError)
+}
+```
+
+```{r}
 # Best Subset
 p <- 3
 betaHat <- Variable(p)
@@ -134,6 +150,29 @@ BS <- rbind(BS, NA, NA, NA, NA, NA, NA)
 ```
 
 ```{r}
+df <- as.data.frame(cbind(Xtrain,Ytrain))
+best.subset <- regsubsets(Ytrain~., df)
+best.subset.summary <- summary(best.subset)
+best.subset.summary$outmat
+```
+
+
+```{r}
+set.seed(1000)
+testP <- NA
+all_P <- seq(1, 9, 1)
+
+for (j in all_P){
+  betaHat <- Variable(j)
+  objective <- Minimize(sum((Ytrain  - Xtrainone[,c(1:j)] %*% betaHat)^2))
+  problem <- Problem(objective)
+  result <- solve(problem)
+  betaHat <- result$getValue(betaHat)
+}
+```
+
+
+```{r}
 # The Ridge
 ridge <- function(lambda){
   br <- solve(t(Xtrain) %*% Xtrain + diag(x = lambda, ncol(Xtrain)), t(Xtrain) %*% (Ytrain - mean(Ytrain)))
@@ -146,20 +185,7 @@ Ridge
 ```
 
 
-```{r}
-# The Ridge lambda calulation
-error <- function(ridge){
-  # We need to add the intercept, not multiply it
-  # Testing error
-  Yhattest <- ridge[-1] %*% t(Xtest) + ridge[1]
-  testError <- sum((Ytest - Yhattest)^2)/dim(Xtest)[1]
-  # Training error
-  Yhattrain <- ridge[-1] %*% t(Xtrain) + ridge[1]
-  trainError <- sum((Ytrain - Yhattrain)^2)/dim(Xtrain)[1]
-  
-  cbind(testError, trainError)
-}
-```
+
 
 ```{r}
 all_lambda <- seq(0, 100, 1)
@@ -192,6 +218,7 @@ testLambda <- NA
 for (j in 1:100){
   data$train <- sample.split(rep(1, dim(data)[1]), SplitRatio = .25)
   Xtrain <- X[data[["train"]], ]
+  # scale the data
   Xtrainscale <- scale(Xtrain)
   Ytrain <- Y[data[["train"]],]
   Xtest <- X[!data[["train"]], ] 
@@ -205,7 +232,6 @@ for (j in 1:100){
   }
   testLambda <- cbind(testLambda, out[-1,1])
   
-  
   #testLambda[which(testLambda[,2] == min(testLambda[,2])),1]
 }
 testLambda[,1] <- all_lambda
@@ -213,6 +239,7 @@ testLambda[,1] <- all_lambda
 testLambda2 <- cbind(testLambda[,1], rowmeans(testLambda[,-1]))
 plot(testLambda2)
 
+# Returns the value of lambda which had the lowest error
 testLambda2[which(testLambda2[,2] == min(testLambda2[,2])),1]
 ```
 
@@ -226,10 +253,16 @@ Ridge
 
 ```{r}
 # The Lasso
-p <- 9
-t <-  .7015
+data$train <- actualSplit
+Xtrain <- X[data[["train"]], ]
+Xtrainscale <- scale(Xtrain)
+Ytrain <- Y[data[["train"]],]
+Xtest <- X[!data[["train"]], ] 
+Ytest <- Y[!data[["train"]], ]
+
+t <- .7015
 ys = scale(Ytrain)
-betaHat <- Variable(p-1)
+betaHat <- Variable(dim(Xtrainscale)[2])
 objective <- Minimize(sum((ys - Xtrainscale %*% betaHat)^2))
 constraint <- list(sum(abs(betaHat)) <=  t)
 problem <- Problem(objective, constraint)
@@ -242,12 +275,36 @@ Lasso <- rbind(round(1000*mean(Ytrain))/1000, Lasso)
 Lasso
 ```
 
-Our result correspond indeed to the results of the Table.
+
+
 ```{r}
-table32 <- as.table(cbind(LS, BS, Ridge, Lasso))
-rownames(table32)[1] <- 'Intercept'
-colnames(table32) <- c('LS', '  Best Subset', '   Ridge', '   Lasso')
-table32
+#PCR
+train <- as.data.frame(cbind(Ytrain, Xtrain))
+pcr_model <- pcr(Ytrain ~ ., data = train)
+
+PCR <- as.matrix(pcr_model$coefficients[49:56])
+PCR <- rbind(mean(Ytrain), PCR)
+PCR
+```
+
+```{r}
+#PLS
+train <- as.data.frame(cbind(Ytrain, Xtrain))
+pls_model <- plsr(Ytrain ~ ., data = train)
+
+PLS <- as.matrix(pls_model$coefficients[9:16])
+PLS <- rbind(mean(Ytrain), PLS)
+PLS
+```
+
+
+
+Our results correspond to the results of Table 3.3
+```{r}
+table33 <- as.table(cbind(LS, BS, Ridge, Lasso, PCR, PLS))
+rownames(table33)[1] <- 'Intercept'
+colnames(table33) <- c('LS', '  Best Subset', '   Ridge', '   Lasso', '     PCR', '     PLS')
+round(table33, 3)
 ```
 
 
