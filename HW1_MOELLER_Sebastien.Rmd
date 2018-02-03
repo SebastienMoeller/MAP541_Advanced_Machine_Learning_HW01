@@ -9,7 +9,7 @@ output: html_document
 ```{r}
 if (!require("pacman")) install.packages("pacman")
 
-pacman::p_load(Rfast)
+pacman::p_load(Rfast, CVXR)
 ```
 
 ## The objectives of the Lab
@@ -28,6 +28,7 @@ X <- scale(data[,1:8])
 
 c) Is it wise to normalize these data?
 
+It depends on what we want to do. For a multilinear regression, it might not be needed. But for interpretation purposes it might be clever (eg PCA)
 
 d) Extract the target variable
 ```{r}
@@ -84,57 +85,105 @@ table32 <- cbind(b,stderr,Z)
 round(table32, 2)
 ```
 
+
+
+
 __Ex.2__ — Your turn
 Reproduce Table 3.3, at least the first four columns that is LS, Best Subset, Ridge and
 Lasso.
 ```{r}
-Xd = data[,2:9]
-n = dim(Xd)[1]
-p = dim(Xd)[2]
+data[32,2] <- 3.8044
+X <- scale(data[,1:8])
+Y <- as.matrix(data[,"lpsa"])
 
-X = (Xd - t(matrix(c(rep(colMeans(Xd), n)), ncol =  n))) / t(matrix(c(rep(c(var(Xd[1]), var(Xd[2]), var(Xd[3]), var(Xd[4]), var(Xd[5]), var(Xd[6]), var(Xd[7]), var(Xd[8])), n)), ncol =  n))
-y = data[10]
+Xtrain <- X[data[["train"]], ] 
+Xtrainscale <- scale(Xtrain)
+Ytrain <- Y[data[["train"]],]
+Xtest <- X[!data[["train"]], ] 
+Ytest <- Y[!data[["train"]], ] 
+Xtrainone <- cbind(array(1, dim = c(nrow(Xtrain),1)), Xtrain) 
+b <- solve(t(Xtrainone) %*% Xtrainone, t(Xtrainone) %*% Ytrain)
 ```
 
-Training
 ```{r}
-ind = which(data['train'] == 0)
-Xa = X[ind,]
-ya = y[ind,]
-na = max(dim(Xd))
+# check if the package works
+p <- 9
+betaHat <- Variable(p)
+objective <- Minimize(sum((Ytrain  - Xtrainone %*% betaHat)^2))
+problem <- Problem(objective)
+result <- solve(problem)
+
+bo <- result$getValue(betaHat)
+round(1000*bo)/1000
+LS <- round(1000*b)/1000
+LS
 ```
 
-Testing
 ```{r}
-ind = which(data['train'] == 1)
-Xt = X[ind,]
-yt = y[ind,]
-nt = max(dim(Xd))
+# Best Subset
+p <- 3
+betaHat <- Variable(p)
+objective <- Minimize(sum((Ytrain  - Xtrainone[,c(1,2,3)] %*% betaHat)^2))
+problem <- Problem(objective)
+result <- solve(problem)
+
+bo <- result$getValue(betaHat)
+BS <- round(1000*bo)/1000
+BS
+BS <- rbind(BS, NA, NA, NA, NA, NA, NA)
 ```
 
-Table 3.1
 ```{r}
-correls(Xa)
+# The Ridge
+p <- 9
+lambda <- 24
+ys = scale(Ytrain)
+betaHat <- Variable(p-1)
+objective <- Minimize(sum((ys - Xtrainscale %*% betaHat)^2) + lambda*sum((betaHat)^2))
+problem <- Problem(objective)
+result <- solve(problem)
+
+d <- sqrt(diag(var(Xtrain)))
+br <- result$getValue(betaHat)*sqrt(var(Ytrain)) / d
+Ridge <- round(1000*br)/1000
+Ridge <- rbind(round(1000*mean(Ytrain))/1000, Ridge)
+Ridge
 ```
 
-%% Table 3.1: Correlations of predictors in the prostate cancer data.
 
-corrcoef(Xa);
-Xr = (Xa - ones(na,1)*mean(Xa))./(ones(na,1)*std(Xa));
-Cv = Xr'*Xr/(n-1);
+```{r}
+# The Lasso
+p <- 9
+t <-  .7015
+ys = scale(Ytrain)
+betaHat <- Variable(p-1)
+objective <- Minimize(sum((ys - Xtrainscale %*% betaHat)^2))
+constraint <- list(sum(abs(betaHat)) <=  t)
+problem <- Problem(objective, constraint)
+result <- solve(problem)
+
+d <- sqrt(diag(var(Xtrain)))
+bl <- result$getValue(betaHat)*sqrt(var(Ytrain)) / d
+Lasso <- round(1000*bl)/1000
+Lasso <- rbind(round(1000*mean(Ytrain))/1000, Lasso)
+Lasso
+```
+
+Our result correspond indeed to the results of the Table.
+```{r}
+Table32 <- as.matrix(cbind(LS, BS, Ridge, Lasso))
+Table32
+```
+
+What have we done here?
 
 
 
-
-
-
-
-
-
-
-
-
-
+Does not work.
+```{r}
+br <- solve(t(Xtrain) %*% Xtrain + diag(x = 24, ncol(Xtrain)), t(Xtrain) %*% (Ytrain - mean(Ytrain)))
+br
+```
 
 
 
