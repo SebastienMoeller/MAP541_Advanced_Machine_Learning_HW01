@@ -171,8 +171,10 @@ Lasso
 
 Our result correspond indeed to the results of the Table.
 ```{r}
-Table32 <- as.matrix(cbind(LS, BS, Ridge, Lasso))
-Table32
+table32 <- as.table(cbind(LS, BS, Ridge, Lasso))
+rownames(table32)[1] <- 'Intercept'
+colnames(table32) <- c('LS', '  Best Subset', '   Ridge', '   Lasso')
+table32
 ```
 
 What have we done here?
