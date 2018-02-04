@@ -15,8 +15,10 @@ pacman::p_load(Rfast, CVXR, caTools, leaps, pls)
 ## The objectives of the Lab
 The purpose of this lab is to reproduce tables from the third chapter of the book "Elements of
 Statistical Learning" from Hastie, Tibshirani and Friedman, as they are shown bellow.
+
 __Ex.1__ Prepare the data
 a) Raw data is available on line, download it from moodle (theData.txt file) or from the web at http://statweb.stanford.edu/~tibs/ElemStatLearn.1stEd/datasets/prostate.data.
+
 ```{r}
 data <- read.table("prostate.data", sep = "")
 actualSplit <- data$train
@@ -29,7 +31,7 @@ X <- scale(data[,1:8])
 
 c) Is it wise to normalize these data?
 
-It depends on what we want to do. For a multilinear regression, it might not be needed. But for interpretation purposes it might be clever (eg PCA)
+It depends on what we want to do. For a multilinear regression, it isn't necessary. However when interpreting the data in terms of multiple variables it can be beneficial such as for PCA.
 
 d) Extract the target variable
 ```{r}
@@ -86,42 +88,53 @@ table32 <- cbind(b,stderr,Z)
 round(table32, 2)
 ```
 
+## __Ex.2__ - Your turn
+#### Reproduce Table 3.3, at least the first four columns that is LS, Best Subset, Ridge and Lasso.
 
-
-
-__Ex.2__ — Your turn
-Reproduce Table 3.3, at least the first four columns that is LS, Best Subset, Ridge and
-Lasso.
+#### Variables needed in the following steps are being built here
 ```{r}
+# The data needs to be corrected
 data[32,2] <- 3.8044
+
+# We scale the variables we are trying to use as regressors
 X <- scale(data[,1:8])
+
+# This is the variable we are trying to predict
 Y <- as.matrix(data[,"lpsa"])
 
-Xtrain <- X[data[["train"]], ] 
-Xtrainscale <- scale(Xtrain)
+# Split the data based on the given train and test set
+Xtrain <- X[data[["train"]], ]
 Ytrain <- Y[data[["train"]],]
 Xtest <- X[!data[["train"]], ] 
-Ytest <- Y[!data[["train"]], ] 
-Xtrainone <- cbind(array(1, dim = c(nrow(Xtrain),1)), Xtrain) 
-b <- solve(t(Xtrainone) %*% Xtrainone, t(Xtrainone) %*% Ytrain)
+Ytest <- Y[!data[["train"]], ]
+
+# We did this in class so I repeated the same method
+Xtrainscale <- scale(Xtrain)
+
+# This matrix's first column is only consisting of 1's
+Xtrainone <- cbind(array(1, dim = c(nrow(Xtrain),1)), Xtrain)
 ```
 
+### Least Squares
 ```{r}
-# check if the package works
-p <- 9
-betaHat <- Variable(p)
+# Needed to use the solve for the lease square
+b <- solve(t(Xtrainone) %*% Xtrainone, t(Xtrainone) %*% Ytrain)
+# Solving for betaHat
+betaHat <- Variable(9)
 objective <- Minimize(sum((Ytrain  - Xtrainone %*% betaHat)^2))
 problem <- Problem(objective)
-result <- solve(problem)
+output <- solve(problem)
 
-bo <- result$getValue(betaHat)
-round(1000*bo)/1000
-LS <- round(1000*b)/1000
+bo <- output$getValue(betaHat)
+# outputting LS solution through package and by hand
+round(bo, 3)
+LS <- round(b, 3)
 LS
 ```
 
 ```{r}
 # error calculation
+# This function takes the estimated parameters as an input and outputs both the test and train errors, hat contains the intercept as well as all estimated coefficients
 error <- function(hat){
   # We need to add the intercept, not multiply it
   # Testing error
@@ -130,129 +143,115 @@ error <- function(hat){
   # Training error
   Yhattrain <- hat[-1] %*% t(Xtrain) + hat[1]
   trainError <- sum((Ytrain - Yhattrain)^2)/dim(Xtrain)[1]
-  
+  # This is the output of the function
   cbind(testError, trainError)
 }
 ```
 
+### Best Subset
 ```{r}
-# Best Subset
-p <- 3
-betaHat <- Variable(p)
-objective <- Minimize(sum((Ytrain  - Xtrainone[,c(1,2,3)] %*% betaHat)^2))
-problem <- Problem(objective)
-result <- solve(problem)
-
-bo <- result$getValue(betaHat)
-BS <- round(1000*bo)/1000
-BS
-BS <- rbind(BS, NA, NA, NA, NA, NA, NA)
-```
-
-```{r}
+# What is the best subset given a number of variables to use in the model?
 df <- as.data.frame(cbind(Xtrain,Ytrain))
 best.subset <- regsubsets(Ytrain~., df)
 best.subset.summary <- summary(best.subset)
 best.subset.summary$outmat
 ```
 
-
 ```{r}
-set.seed(1000)
-testP <- NA
-all_P <- seq(1, 9, 1)
+# To recreate the table 3.3 we need to calculate the coeficients where we only have three variables
+betaHat <- Variable(3)
+objective <- Minimize(sum((Ytrain  - Xtrainone[,c(1,2,3)] %*% betaHat)^2))
+problem <- Problem(objective)
+result <- solve(problem)
 
-for (j in all_P){
-  betaHat <- Variable(j)
-  objective <- Minimize(sum((Ytrain  - Xtrainone[,c(1:j)] %*% betaHat)^2))
-  problem <- Problem(objective)
-  result <- solve(problem)
-  betaHat <- result$getValue(betaHat)
-}
+bo <- result$getValue(betaHat)
+BS <- round(bo, 3)
+BS
+# Thanks to the table above we know which coefficents correspond to each variable
+BS <- rbind(BS, 0, 0, 0, 0, 0, 0)
 ```
 
-
 ```{r}
-# The Ridge
+best.subset.by.bic <- which.min(best.subset.summary$bic)
+best.subset.by.cp <- which.min(best.subset.summary$cp)
+best.subset.by.adjr2 <- which.max(best.subset.summary$adjr2)
+
+par(mfrow=c(2,2))
+plot(best.subset$rss, xlab="Number of Variables", ylab="RSS", type="l")
+plot(best.subset.summary$adjr2, xlab="Number of Variables", ylab="Adjusted RSq", type="l")
+points(best.subset.by.adjr2, best.subset.summary$adjr2[best.subset.by.adjr2], col="red", cex =2, pch =20)
+plot(best.subset.summary$bic, xlab="Number of Variables", ylab="BIC", type="l")
+points(best.subset.by.bic, best.subset.summary$bic[best.subset.by.bic], col="red", cex =2, pch =20)
+plot(best.subset.summary$cp, xlab="Number of Variables", ylab="CP", type="l")
+points(best.subset.by.cp, best.subset.summary$cp[best.subset.by.cp], col="red", cex =2, pch =20)
+```
+
+How do we argue that the model only needs 2 variables and the intercept?
+
+Based on the Bayesian Information Criterion I choose to use 2 variables for the best subset to build the model as that is when the BIC is minimized. Approximately 60% of the variance is explained by the first two variables whilst simultaniously reducing the complexity of the model.
+
+### The Ridge
+```{r}
+# Given a value of lambda this function returns the estimated coefficients of the ridge
 ridge <- function(lambda){
   br <- solve(t(Xtrain) %*% Xtrain + diag(x = lambda, ncol(Xtrain)), t(Xtrain) %*% (Ytrain - mean(Ytrain)))
-  br <- rbind(mean(Ytrain), br)
-  br
+  bRidge <- rbind(mean(Ytrain), br)
+  bRidge
 }
-
-Ridge <- round(1000*ridge(24))/1000
-Ridge
-```
-
-
-
-
-```{r}
-all_lambda <- seq(0, 100, 1)
-
-out <- NA
-for (i in all_lambda){
-  out <- rbind(out, error(ridge(i)))
-}
-testLambda <- cbind(all_lambda, out[-1,])
 ```
 
 ```{r}
-all_lambda <- seq(0, 20, .1)
-
-out <- NA
-for (i in all_lambda){
-  out <- rbind(out, error(ridge(i)))
-}
-testLambda <- cbind(all_lambda, out[-1,])
-
-plot(testLambda)
-
-testLambda[which(testLambda[,2] == min(testLambda[,2])),1]
-```
-
-```{r}
-# 65543
-set.seed(1000)
+# Setting the seed to build reproducible 'randomization' results
+set.seed(100)
 testLambda <- NA
+# I will split the data randomly 100 times in the same ratio as the original split
 for (j in 1:100){
-  data$train <- sample.split(rep(1, dim(data)[1]), SplitRatio = .25)
+  data$train <- sample.split(rep(1, dim(data)[1]), SplitRatio = 30/67)
   Xtrain <- X[data[["train"]], ]
-  # scale the data
-  Xtrainscale <- scale(Xtrain)
   Ytrain <- Y[data[["train"]],]
   Xtest <- X[!data[["train"]], ] 
   Ytest <- Y[!data[["train"]], ] 
   
   all_lambda <- seq(0, 30, .1)
   
+  # For a given train test split, what is the mean squared error
   out <- NA
   for (i in all_lambda){
     out <- rbind(out, error(ridge(i)))
   }
+  # As the training error only increases with lambda, we only save the testing error
   testLambda <- cbind(testLambda, out[-1,1])
   
+  # When printed this line of code returns the value of lambda at which the error was lowest
   #testLambda[which(testLambda[,2] == min(testLambda[,2])),1]
 }
+
+# These are the values of lambda we are checking, they are between 0 to 30 in discrete intervals of 0.1 to easily check the range. It does not return the true minimum but for out analytical purposes it is sufficient information.
 testLambda[,1] <- all_lambda
 
+# We built a matrix with the checked values of lambda in the first column and the average error between 100 random splits for the same value of lambda
 testLambda2 <- cbind(testLambda[,1], rowmeans(testLambda[,-1]))
-plot(testLambda2)
+```
 
+```{r}
+# The resulting data gives us this plot
+plot(testLambda2)
+```
+
+```{r}
 # Returns the value of lambda which had the lowest error
 testLambda2[which(testLambda2[,2] == min(testLambda2[,2])),1]
 ```
 
-
-
+##### On average the best value for lambda was 7. It is possible to split the data such that a value of 24 for lambda is recommended, however, that is uncommon.
 ```{r}
-Ridge <- ridge(24)
+# The table seems to have used a lambda value of 24 to produce the results of table 3.3
+Ridge <- round(ridge(24), 3)
 Ridge
 ```
 
-
+### The Lasso
 ```{r}
-# The Lasso
 data$train <- actualSplit
 Xtrain <- X[data[["train"]], ]
 Xtrainscale <- scale(Xtrain)
@@ -269,46 +268,67 @@ problem <- Problem(objective, constraint)
 result <- solve(problem)
 
 d <- sqrt(diag(var(Xtrain)))
-bl <- result$getValue(betaHat)*sqrt(var(Ytrain)) / d
-Lasso <- round(1000*bl)/1000
-Lasso <- rbind(round(1000*mean(Ytrain))/1000, Lasso)
+bLasso <- result$getValue(betaHat)*sqrt(var(Ytrain)) / d
+Lasso <- round(bLasso, 3)
+Lasso <- rbind(round(mean(Ytrain), 3), Lasso)
 Lasso
 ```
 
-
-
+### PCR
 ```{r}
-#PCR
 train <- as.data.frame(cbind(Ytrain, Xtrain))
 pcr_model <- pcr(Ytrain ~ ., data = train)
 
 PCR <- as.matrix(pcr_model$coefficients[49:56])
-PCR <- rbind(mean(Ytrain), PCR)
+PCR <- round(rbind(mean(Ytrain), PCR), 3)
 PCR
 ```
 
+### PLS
 ```{r}
-#PLS
 train <- as.data.frame(cbind(Ytrain, Xtrain))
 pls_model <- plsr(Ytrain ~ ., data = train)
 
 PLS <- as.matrix(pls_model$coefficients[9:16])
-PLS <- rbind(mean(Ytrain), PLS)
+PLS <- round(rbind(mean(Ytrain), PLS), 3)
 PLS
 ```
 
-
-
-Our results correspond to the results of Table 3.3
+### Table 3.3
 ```{r}
 table33 <- as.table(cbind(LS, BS, Ridge, Lasso, PCR, PLS))
 rownames(table33)[1] <- 'Intercept'
 colnames(table33) <- c('LS', '  Best Subset', '   Ridge', '   Lasso', '     PCR', '     PLS')
-round(table33, 3)
+
+# Outputting all our calculated coefficents into one table we recieve the same values and those of table 3.3
+table33
 ```
 
+### Calcualting the errors
+```{r}
+# Given a vector of estimated parameters the function returns the test error and the Std error
+error <- function(hat){
 
+  Yhattest <- Xtest %*% hat[-1] + hat[1]
+  Error <- Ytest - Yhattest
+  # Testing error
+  testError <- sum((Error)^2)/dim(Xtest)[1]
+  # Standard error
+  stdError <- sd((Error)^2)/sqrt(dim(Xtest)[1])
+  
+  rbind(testError, stdError)
+}
+```
 
+```{r}
+testStdErrors <- cbind(round(error(LS), 3), round(error(BS), 3), round(error(Ridge), 3), round(error(Lasso), 3), round(error(PCR), 3), round(error(PLS), 3))
+testStdErrors
+```
+
+### Table 3.3 Completed
+```{r}
+rbind(table33, testStdErrors)
+```
 
 
 
